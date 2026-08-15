@@ -1,6 +1,6 @@
 {
   "name": "Station — Suivi ISS",
-  "short_name": "Station",
+  "short_name": "Station ISS",
   "description": "Suivi en direct de la Station spatiale internationale et prévision de ses passages visibles.",
   "start_url": ".",
   "scope": ".",

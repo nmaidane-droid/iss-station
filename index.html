@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0A1526">
 <meta name="description" content="Suivi en direct de la Station spatiale internationale et prévision de ses passages visibles.">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Station">
+<meta name="apple-mobile-web-app-title" content="Station ISS">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -357,8 +357,7 @@ function demanderPosition(){
   nom.textContent="Localisation…"; btn.hidden=true;
   navigator.geolocation.getCurrentPosition(async p=>{
     moi={lat:p.coords.latitude,lon:p.coords.longitude,nom:"Position GPS"};
-    afficherMoi(); suivi=false; btnC.setAttribute("aria-pressed",false);
-    carte.setView([moi.lat,moi.lon],4);
+    afficherMoi();   /* le marqueur est posé, mais la carte continue de suivre l'ISS */
     const n=await nommerLieu(moi.lat,moi.lon); if(n){moi.nom=n; afficherMoi();}
   },err=>{
     nom.textContent=err.code===1?"Position refusée":"Position indisponible";
