@@ -233,8 +233,12 @@ const fondPlan=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/
 const fondSat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
   {attribution:"Imagerie © Esri",maxZoom:8});
 
-const cNuit=[-360,0,360].map(()=>L.polygon([],{color:"#2B5C8F",weight:1,opacity:.5,
+const cNuit=[-360,0,360].map(()=>L.polygon([],{stroke:false,
   fillColor:"#0B1B2E",fillOpacity:.34,interactive:false}).addTo(carte));
+/* la courbe du terminateur, tracée à part : le contour du polygone dessinerait
+   aussi ses segments de fermeture, d'où une ligne verticale parasite */
+const cLigne=[-360,0,360].map(()=>L.polyline([],{color:"#2B5C8F",weight:1,opacity:.55,
+  interactive:false}).addTo(carte));
 const orbB=[],orbA=[];
 COPIES.forEach(()=>{
   orbB.push(L.polyline([],{color:"#08131F",weight:4,opacity:.30,interactive:false,lineJoin:"round"}).addTo(carte));
@@ -278,10 +282,13 @@ function soleil(d){
 function tracerNuit(){
   let {dec,lonSub}=soleil(new Date());
   if(Math.abs(dec)<.3) dec=dec>=0?.3:-.3;
-  const haut=dec>0?-85:85, base=[];
-  for(let lon=-180;lon<=180;lon+=2) base.push([Math.atan(-Math.cos((lon-lonSub)*R)/Math.tan(dec*R))*D,lon]);
-  base.push([haut,180],[haut,-180]);
-  [-360,0,360].forEach((dx,k)=>cNuit[k].setLatLngs(base.map(([la,lo])=>[la,lo+dx])));
+  const haut=dec>0?-85:85, courbe=[];
+  for(let lon=-180;lon<=180;lon+=2) courbe.push([Math.atan(-Math.cos((lon-lonSub)*R)/Math.tan(dec*R))*D,lon]);
+  const zone=courbe.concat([[haut,180],[haut,-180]]);
+  [-360,0,360].forEach((dx,k)=>{
+    cNuit[k].setLatLngs(zone.map(([la,lo])=>[la,lo+dx]));
+    cLigne[k].setLatLngs(courbe.map(([la,lo])=>[la,lo+dx]));
+  });
 }
 function estDeNuit(lat,lon){
   const {dec,lonSub}=soleil(new Date());
