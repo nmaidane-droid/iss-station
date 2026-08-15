@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A1526">
+<meta name="description" content="Suivi en direct de la Station spatiale internationale et prévision de ses passages visibles.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Station">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Station — Suivi ISS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--nuit:#0A1526;--ardoise:#12233D;--ambre:#F5A623;--turquoise:#6FD3C7;
+  --texte:#E8EDF5;--texte-faible:#8DA3BE;--bordure:rgba(111,211,199,.14)}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--nuit);color:var(--texte);font-family:'Barlow',system-ui,sans-serif}
+body{max-width:520px;margin:0 auto;padding:0 0 40px;background-image:radial-gradient(circle at 18% 8%,rgba(45,90,140,.30),transparent 55%)}
+h1,h2,h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.04em;text-transform:uppercase;line-height:1}
+.mono{font-family:'IBM Plex Mono',monospace}
+
+.bandeau{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 12px) 18px 12px;
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--texte-faible);border-bottom:1px solid var(--bordure)}
+.pastille{width:6px;height:6px;border-radius:50%;background:var(--ambre);animation:pouls 2.4s infinite}
+@keyframes pouls{0%{box-shadow:0 0 0 0 rgba(245,166,35,.55)}70%{box-shadow:0 0 0 7px rgba(245,166,35,0)}100%{box-shadow:0 0 0 0 rgba(245,166,35,0)}}
+.bandeau .droite{margin-left:auto;color:var(--turquoise)}
+
+.carte-zone{position:relative;height:46vh;min-height:280px;max-height:420px;background:#0D1B30;border-bottom:1px solid var(--bordure)}
+#carte{position:absolute;inset:0;background:#0D1B30}
+.leaflet-container{background:#0D1B30;font-family:'IBM Plex Mono',monospace}
+.leaflet-control-attribution{background:rgba(10,21,38,.72)!important;color:#5F7590!important;font-size:8px!important;padding:1px 5px!important}
+.leaflet-control-attribution a{color:#7A90AC!important}
+.leaflet-control-zoom{border:none!important;box-shadow:none!important;margin-top:50px!important;margin-right:10px!important}
+.leaflet-control-zoom a{background:rgba(10,21,38,.88)!important;color:var(--texte)!important;border:1px solid var(--bordure)!important;
+  width:26px!important;height:26px!important;line-height:24px!important;font-size:14px!important}
+
+.marqueur-iss i{position:absolute;left:-6px;top:-6px;width:14px;height:14px;border-radius:50%;
+  background:var(--ambre);border:2px solid #0A1526;box-shadow:0 0 12px rgba(245,166,35,.85)}
+.marqueur-iss::before{content:"";position:absolute;left:-19px;top:-19px;width:40px;height:40px;border-radius:50%;
+  background:radial-gradient(circle,rgba(245,166,35,.30),transparent 70%);animation:pouls2 3s infinite}
+@keyframes pouls2{0%,100%{transform:scale(.85);opacity:.65}50%{transform:scale(1.15);opacity:1}}
+.marqueur-moi i{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;
+  background:var(--turquoise);border:2px solid #0A1526;box-shadow:0 0 8px rgba(111,211,199,.8)}
+.marqueur-moi b{position:absolute;left:10px;top:-7px;font-family:'IBM Plex Mono',monospace;font-size:9px;
+  font-weight:500;color:#0A1526;background:var(--turquoise);padding:2px 5px;border-radius:3px;white-space:nowrap}
+
+.fond-onglets{position:absolute;left:10px;top:10px;z-index:500;display:flex;border:1px solid var(--bordure);
+  border-radius:5px;overflow:hidden;background:rgba(10,21,38,.88);backdrop-filter:blur(6px)}
+.fond-onglets button{width:74px;background:transparent;border:none;color:var(--texte-faible);
+  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  padding:7px 0;text-align:center;cursor:pointer}
+.fond-onglets button[aria-selected="true"]{background:var(--ambre);color:#0A1526;font-weight:600}
+#btn-centrer{position:absolute;right:10px;top:10px;z-index:500;display:flex;align-items:center;gap:6px;
+  background:rgba(10,21,38,.88);border:1px solid var(--bordure);color:var(--texte-faible);
+  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  padding:7px 10px;border-radius:5px;cursor:pointer;backdrop-filter:blur(6px)}
+#btn-centrer[aria-pressed="true"]{border-color:var(--ambre);color:var(--ambre)}
+#btn-centrer .led{width:5px;height:5px;border-radius:50%;background:#41546E}
+#btn-centrer[aria-pressed="true"] .led{background:var(--ambre);animation:pouls 2.4s infinite}
+button:focus-visible{outline:2px solid var(--turquoise);outline-offset:2px}
+
+.survol{position:absolute;left:10px;bottom:10px;z-index:500;pointer-events:none;
+  background:rgba(10,21,38,.86);border:1px solid var(--bordure);border-radius:6px;padding:8px 11px;backdrop-filter:blur(6px)}
+.survol .sur{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--turquoise)}
+.survol .nom{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.survol .ombre{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);margin-top:3px}
+
+.telemetrie{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--bordure)}
+.tele{padding:12px 6px;text-align:center;border-right:1px solid var(--bordure)}
+.tele:last-child{border-right:none}
+.tele .val{font-family:'IBM Plex Mono',monospace;font-size:14.5px;font-weight:600}
+.tele .val small{font-size:9px;font-weight:400;color:var(--texte-faible);margin-left:2px}
+.tele .lab{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);margin-top:4px}
+
+.obs{margin:18px 18px 0;border:1px solid var(--bordure);border-radius:10px;background:rgba(18,35,61,.45);padding:14px 15px}
+.obs .titre{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--turquoise)}
+.obs .nom{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:22px;text-transform:uppercase;letter-spacing:.04em;margin-top:6px}
+.obs .coord{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--texte-faible);margin-top:3px;line-height:1.55}
+.obs .ligne2{display:flex;align-items:baseline;gap:7px;margin-top:12px;padding-top:12px;border-top:1px solid var(--bordure);
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--texte-faible)}
+.obs .ligne2 b{color:var(--texte);font-weight:600;font-size:14px}
+.obs .etat{margin-left:auto;font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border:1px solid var(--bordure);border-radius:3px}
+.obs .etat.oui{color:var(--ambre);border-color:rgba(245,166,35,.45)}
+.obs button{margin-top:11px;width:100%;background:transparent;border:1px solid rgba(245,166,35,.5);color:var(--ambre);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:9px;border-radius:5px;cursor:pointer}
+
+section{padding:22px 18px 0}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--turquoise);display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--bordure)}
+
+.passage{background:linear-gradient(160deg,var(--ardoise),#0D1B30);border:1px solid var(--bordure);border-radius:10px;overflow:hidden}
+.passage-haut{display:flex;align-items:center;gap:12px;padding:16px 14px 13px}
+.compte{flex:1;min-width:0}
+.compte .quand{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--texte-faible);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.compte .chrono{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:42px;line-height:.92;
+  color:var(--ambre);margin-top:5px;font-variant-numeric:tabular-nums}
+.compte .heure{font-family:'IBM Plex Mono',monospace;font-size:10.5px;margin-top:7px;white-space:nowrap}
+.compte .heure b{color:var(--turquoise);font-weight:500}
+.ciel{flex:0 0 118px}
+.passage-bas{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--bordure)}
+.pb{padding:11px 12px;border-right:1px solid var(--bordure)}
+.pb:last-child{border-right:none}
+.pb .v{font-family:'IBM Plex Mono',monospace;font-size:13.5px;font-weight:600}
+.pb .l{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);margin-top:3px}
+.message{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;color:var(--texte-faible);
+  padding:18px 16px;text-align:center}
+.message b{display:block;color:var(--texte);font-size:12px;margin-bottom:5px}
+
+.liste{border-top:1px solid var(--bordure)}
+.ligne{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--bordure)}
+.ligne .jour{font-family:'IBM Plex Mono',monospace;font-size:11px;width:80px;flex:0 0 80px}
+.ligne .jour em{display:block;font-style:normal;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);margin-top:2px}
+.jauge{flex:1;height:4px;background:rgba(111,211,199,.12);border-radius:2px;overflow:hidden}
+.jauge i{display:block;height:100%;background:linear-gradient(90deg,var(--turquoise),var(--ambre));border-radius:2px}
+.ligne .elev{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;width:52px;text-align:right;flex:0 0 52px}
+.ligne .elev small{font-size:8.5px;color:var(--texte-faible);display:block;letter-spacing:.06em;margin-top:2px}
+
+.note{font-family:'IBM Plex Mono',monospace;font-size:9.5px;line-height:1.65;color:var(--texte-faible);
+  margin-top:26px;padding:12px 14px;border-left:2px solid rgba(245,166,35,.22);background:rgba(18,35,61,.4)}
+.note b{color:var(--turquoise);font-weight:500}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="bandeau">
+  <span class="pastille"></span><span>ISS · ZARYA — 25544</span>
+  <span class="droite mono" id="horloge">—</span>
+</div>
+
+<div class="carte-zone">
+  <div id="carte"></div>
+  <div class="fond-onglets" role="tablist">
+    <button id="ong-plan" role="tab" aria-selected="true">Plan</button>
+    <button id="ong-sat" role="tab" aria-selected="false">Satellite</button>
+  </div>
+  <button id="btn-centrer" aria-pressed="true"><span class="led"></span>Suivre</button>
+  <div class="survol">
+    <div class="sur">À la verticale de</div>
+    <div class="nom" id="survol-nom">—</div>
+    <div class="ombre" id="badge-ombre">—</div>
+  </div>
+</div>
+
+<div class="telemetrie">
+  <div class="tele"><div class="val" id="t-alt">—</div><div class="lab">Altitude</div></div>
+  <div class="tele"><div class="val" id="t-vit">—</div><div class="lab">Vitesse</div></div>
+  <div class="tele"><div class="val" id="t-lat">—</div><div class="lab">Latitude</div></div>
+  <div class="tele"><div class="val" id="t-lon">—</div><div class="lab">Longitude</div></div>
+</div>
+
+<div class="obs">
+  <div class="titre">Ma position</div>
+  <div class="nom" id="moi-nom">Localisation…</div>
+  <div class="coord" id="moi-coord">—</div>
+  <div class="ligne2" id="moi-ligne2" hidden>
+    <span>Distance</span><b id="d-km">—</b><span>km</span>
+    <span class="etat" id="d-etat">—</span>
+  </div>
+  <button id="moi-btn" hidden>Autoriser ma position</button>
+</div>
+
+<section>
+  <div class="eyebrow">Prochain passage visible</div>
+  <div class="passage">
+    <div class="message" id="p-message"><b>Calcul en cours</b>Les passages sont calculés dès que ta position est connue.</div>
+    <div id="p-detail" hidden>
+      <div class="passage-haut">
+        <div class="compte">
+          <div class="quand" id="p-quand">—</div>
+          <div class="chrono" id="p-chrono">—:—:—</div>
+          <div class="heure">Lever <b id="p-debut">—</b> · Coucher <b id="p-fin">—</b></div>
+        </div>
+        <div class="ciel">
+          <svg viewBox="0 0 120 120" aria-label="Trajectoire dans le ciel">
+            <g stroke="#33608F" fill="none" stroke-width=".7">
+              <circle cx="60" cy="60" r="52"/><circle cx="60" cy="60" r="34.7" opacity=".6"/>
+              <circle cx="60" cy="60" r="17.3" opacity=".35"/>
+              <line x1="60" y1="8" x2="60" y2="112" opacity=".35"/><line x1="8" y1="60" x2="112" y2="60" opacity=".35"/>
+            </g>
+            <polyline id="arc-passage" fill="none" stroke="#F5A623" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle id="pt-debut" r="2.2" fill="none" stroke="#6FD3C7" stroke-width="1.4"/>
+            <circle id="pt-max" r="2.8" fill="#F5A623"/>
+            <g font-family="IBM Plex Mono" font-size="7" fill="#8DA3BE" text-anchor="middle">
+              <text x="60" y="5.5">N</text><text x="117" y="62.5">E</text>
+              <text x="60" y="119">S</text><text x="3" y="62.5">O</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div class="passage-bas">
+        <div class="pb"><div class="v" id="p-elev">—</div><div class="l">Élévation max</div></div>
+        <div class="pb"><div class="v" id="p-mag">—</div><div class="l">Magnitude</div></div>
+        <div class="pb"><div class="v" id="p-duree">—</div><div class="l">Durée</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Passages des sept prochains jours</div>
+  <div class="liste" id="liste-passages"></div>
+  <div class="note">
+    Passages calculés par propagation <b>SGP4</b> à partir des éléments orbitaux du jour, avec test
+    d'illumination du satellite et de nuit au sol. La courbe sur la carte représente le plan orbital
+    instantané, pas le trajet des prochaines heures.
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const R=Math.PI/180, D=180/Math.PI, pad=n=>String(n).padStart(2,"0");
+const COPIES=[-720,-360,0,360,720];
+let suivi=true, moi=null, tzMoi=Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+/* ============ Carte ============ */
+const carte=L.map("carte",{zoomControl:false,attributionControl:true,minZoom:0,maxZoom:8,zoomSnap:.25,
+  zoomDelta:.5,wheelPxPerZoomLevel:80}).setView([10,0],1);
+L.control.zoom({position:"topright"}).addTo(carte);
+const fondPlan=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  {attribution:'© OpenStreetMap · © CARTO',subdomains:"abcd",maxZoom:8}).addTo(carte);
+const fondSat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  {attribution:"Imagerie © Esri",maxZoom:8});
+
+const cNuit=[-360,0,360].map(()=>L.polygon([],{color:"#2B5C8F",weight:1,opacity:.5,
+  fillColor:"#0B1B2E",fillOpacity:.34,interactive:false}).addTo(carte));
+const orbB=[],orbA=[];
+COPIES.forEach(()=>{
+  orbB.push(L.polyline([],{color:"#08131F",weight:4,opacity:.30,interactive:false,lineJoin:"round"}).addTo(carte));
+  orbA.push(L.polyline([],{color:"#F5A623",weight:2.2,opacity:1,interactive:false,lineJoin:"round"}).addTo(carte));
+});
+const zoneVis=L.circle([0,0],{radius:2250000,color:"#F5A623",weight:1.2,opacity:.55,
+  fillColor:"#F5A623",fillOpacity:.09,interactive:false}).addTo(carte);
+const mISS=L.marker([0,0],{icon:L.divIcon({className:"marqueur-iss",html:"<i></i>",iconSize:[0,0]}),
+  zIndexOffset:1000,interactive:false}).addTo(carte);
+let mMoi=null;
+const zoomMonde=()=>Math.max(0,Math.log2(carte.getSize().x/256));
+
+const ongPlan=document.getElementById("ong-plan"), ongSat=document.getElementById("ong-sat");
+function choisirFond(sat){
+  carte.removeLayer(sat?fondPlan:fondSat);
+  (sat?fondSat:fondPlan).addTo(carte);
+  ongSat.setAttribute("aria-selected",sat); ongPlan.setAttribute("aria-selected",!sat);
+}
+ongPlan.onclick=()=>choisirFond(false);
+ongSat.onclick=()=>choisirFond(true);
+const btnC=document.getElementById("btn-centrer");
+btnC.onclick=()=>{suivi=!suivi;btnC.setAttribute("aria-pressed",suivi);
+  if(suivi&&courante) carte.flyTo(courante,carte.getZoom(),{duration:.8});};
+carte.on("dragstart",()=>{if(suivi){suivi=false;btnC.setAttribute("aria-pressed",false);}});
+
+/* ============ Soleil ============ */
+function soleilRaDec(d){
+  const n=d.getTime()/86400000+2440587.5-2451545.0;
+  const L0=(280.460+0.9856474*n)%360, g=(357.528+0.9856003*n)%360;
+  const lam=(L0+1.915*Math.sin(g*R)+0.020*Math.sin(2*g*R))%360, eps=(23.439-4e-7*n)*R;
+  const dec=Math.asin(Math.sin(eps)*Math.sin(lam*R));
+  const ra=Math.atan2(Math.cos(eps)*Math.sin(lam*R),Math.cos(lam*R));
+  return {ra,dec};
+}
+function soleil(d){
+  const {ra,dec}=soleilRaDec(d);
+  const n=d.getTime()/86400000+2440587.5-2451545.0;
+  const gmst=(18.697374558+24.06570982441908*n)%24;
+  return {dec:dec*D, lonSub:((ra*D-gmst*15+540)%360)-180};
+}
+function tracerNuit(){
+  let {dec,lonSub}=soleil(new Date());
+  if(Math.abs(dec)<.3) dec=dec>=0?.3:-.3;
+  const haut=dec>0?-85:85, base=[];
+  for(let lon=-180;lon<=180;lon+=2) base.push([Math.atan(-Math.cos((lon-lonSub)*R)/Math.tan(dec*R))*D,lon]);
+  base.push([haut,180],[haut,-180]);
+  [-360,0,360].forEach((dx,k)=>cNuit[k].setLatLngs(base.map(([la,lo])=>[la,lo+dx])));
+}
+function estDeNuit(lat,lon){
+  const {dec,lonSub}=soleil(new Date());
+  return Math.sin(lat*R)*Math.sin(dec*R)+Math.cos(lat*R)*Math.cos(dec*R)*Math.cos((lon-lonSub)*R)<0;
+}
+
+/* ============ Orbite fermée sur la carte ============ */
+const INC=51.64, PERIODE=92.9, DERIVE=360/(23.9345*60);
+let ancre=null, courante=null, prochainTrace=0;
+function alphaCont(u){
+  const a=Math.atan2(Math.cos(INC*R)*Math.sin(u*R),Math.cos(u*R))*D;
+  return a+360*Math.round((u-a)/360);
+}
+function ancrer(lat,lon,ascendant,t0){
+  let u0=Math.asin(Math.max(-1,Math.min(1,Math.sin(lat*R)/Math.sin(INC*R))))*D;
+  if(!ascendant) u0=180-u0;
+  ancre={t0,u0,lonNoeud:lon-alphaCont(u0)};
+}
+function positionA(now){
+  const dt=(now-ancre.t0)/60000, u=ancre.u0+360*dt/PERIODE;
+  return {lat:Math.asin(Math.sin(INC*R)*Math.sin(u*R))*D,
+          lon:ancre.lonNoeud+alphaCont(u)-DERIVE*dt, u};
+}
+function dessinerOrbite(u,lonNoeud){
+  const pts=[];
+  for(let k=-180;k<=180;k+=2){
+    const uu=u+k;
+    pts.push([Math.asin(Math.sin(INC*R)*Math.sin(uu*R))*D, lonNoeud+alphaCont(uu)]);
+  }
+  COPIES.forEach((dx,k)=>{
+    const q=pts.map(([la,lo])=>[la,lo+dx]);
+    orbB[k].setLatLngs(q); orbA[k].setLatLngs(q);
+  });
+}
+const normLon=l=>((l+540)%360)-180;
+
+/* ============ Régions survolées ============ */
+const REGIONS=[
+  {n:"Océan Pacifique",la:[-55,60],lo:[-180,-100]},{n:"Océan Pacifique",la:[-55,60],lo:[140,180]},
+  {n:"Amérique du Nord",la:[15,72],lo:[-130,-60]},{n:"Amérique du Sud",la:[-56,13],lo:[-82,-35]},
+  {n:"Océan Atlantique",la:[-55,65],lo:[-60,-10]},{n:"Europe",la:[36,71],lo:[-10,40]},
+  {n:"Afrique du Nord",la:[15,36],lo:[-17,35]},{n:"Afrique subsaharienne",la:[-35,15],lo:[-17,50]},
+  {n:"Océan Indien",la:[-55,25],lo:[45,100]},{n:"Asie centrale",la:[36,60],lo:[40,90]},
+  {n:"Asie de l'Est",la:[18,55],lo:[90,140]},{n:"Asie du Sud-Est",la:[-12,18],lo:[95,140]},
+  {n:"Australie",la:[-45,-10],lo:[112,155]},{n:"Océan Austral",la:[-90,-55],lo:[-180,180]},
+  {n:"Arctique",la:[72,90],lo:[-180,180]}
+];
+const region=(la,lo)=>(REGIONS.find(r=>la>=r.la[0]&&la<=r.la[1]&&lo>=r.lo[0]&&lo<=r.lo[1])||{n:"Haute mer"}).n;
+
+/* ============ Ma position ============ */
+function afficherMoi(){
+  if(mMoi) carte.removeLayer(mMoi);
+  mMoi=L.marker([moi.lat,moi.lon],{icon:L.divIcon({className:"marqueur-moi",
+    html:`<i></i><b>${moi.nom.toUpperCase()}</b>`,iconSize:[0,0]}),zIndexOffset:900,interactive:false}).addTo(carte);
+  document.getElementById("moi-nom").textContent=moi.nom;
+  document.getElementById("moi-coord").textContent=
+    Math.abs(moi.lat).toFixed(3)+"° "+(moi.lat>=0?"N":"S")+"   "+Math.abs(moi.lon).toFixed(3)+"° "+(moi.lon>=0?"E":"O");
+  document.getElementById("moi-ligne2").hidden=false;
+  document.getElementById("moi-btn").hidden=true;
+  majDistance(); lancerCalcul();
+}
+async function nommerLieu(lat,lon){
+  try{
+    const j=await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=${lat}&lon=${lon}`,
+      {headers:{"Accept-Language":"fr"}})).json();
+    const a=j.address||{};
+    return a.village||a.town||a.city||a.municipality||a.county||j.name||null;
+  }catch(e){ return null; }
+}
+function demanderPosition(){
+  const nom=document.getElementById("moi-nom"), coord=document.getElementById("moi-coord"), btn=document.getElementById("moi-btn");
+  if(!navigator.geolocation){ nom.textContent="GPS indisponible"; coord.textContent=""; btn.hidden=false; return; }
+  nom.textContent="Localisation…"; btn.hidden=true;
+  navigator.geolocation.getCurrentPosition(async p=>{
+    moi={lat:p.coords.latitude,lon:p.coords.longitude,nom:"Position GPS"};
+    afficherMoi(); suivi=false; btnC.setAttribute("aria-pressed",false);
+    carte.setView([moi.lat,moi.lon],4);
+    const n=await nommerLieu(moi.lat,moi.lon); if(n){moi.nom=n; afficherMoi();}
+  },err=>{
+    nom.textContent=err.code===1?"Position refusée":"Position indisponible";
+    coord.textContent=err.code===1?"Autorise l'accès dans les réglages du site":"Réessaie dans un instant";
+    btn.hidden=false;
+    message("Position requise","Les passages dépendent du lieu d'observation.");
+  },{enableHighAccuracy:true,timeout:12000,maximumAge:300000});
+}
+document.getElementById("moi-btn").onclick=demanderPosition;
+
+function distanceKm(a,b,c,d){
+  const h=Math.sin((c-a)*R/2)**2+Math.cos(a*R)*Math.cos(c*R)*Math.sin((d-b)*R/2)**2;
+  return 6371*2*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function majDistance(){
+  if(!moi||!courante) return;
+  const km=distanceKm(moi.lat,moi.lon,courante[0],courante[1]);
+  document.getElementById("d-km").textContent=Math.round(km).toLocaleString("fr-FR");
+  const e=document.getElementById("d-etat"), dessus=km<2250;
+  e.textContent=dessus?"Au-dessus de l'horizon":"Sous l'horizon";
+  e.className="etat"+(dessus?" oui":"");
+}
+
+/* ============ Flux position ============ */
+const API="https://api.wheretheiss.at/v1/satellites/25544";
+let alt=418, vit=27580, premier=true;
+async function recaler(){
+  try{
+    const t=Math.floor(Date.now()/1000);
+    const j=await (await fetch(`${API}/positions?timestamps=${t},${t+120}&units=kilometers`,{cache:"no-store"})).json();
+    const a=j[0];
+    alt=a.altitude; vit=a.velocity;
+    ancrer(a.latitude,a.longitude,j[1].latitude>a.latitude,Date.now());
+    prochainTrace=0;
+    if(premier){ premier=false; carte.setView([a.latitude,a.longitude],zoomMonde()); }
+  }catch(e){
+    if(!ancre&&satrec){ const p=positionSGP4(new Date());
+      if(p){ ancrer(p.lat,p.lon,true,Date.now());
+        if(premier){premier=false;carte.setView([p.lat,p.lon],zoomMonde());} } }
+  }
+}
+function animer(){
+  if(!ancre) return;
+  const now=Date.now(), p=positionA(now), lon=normLon(p.lon);
+  courante=[p.lat,lon];
+  mISS.setLatLng(courante); zoneVis.setLatLng(courante);
+  if(suivi) carte.panTo(courante,{animate:false});
+  if(now>=prochainTrace){ prochainTrace=now+2000; dessinerOrbite(p.u,p.lon-alphaCont(p.u)); }
+  document.getElementById("t-alt").innerHTML=Math.round(alt)+'<small>km</small>';
+  document.getElementById("t-vit").innerHTML=(Math.round(vit/10)*10).toLocaleString("fr-FR")+'<small>km/h</small>';
+  document.getElementById("t-lat").textContent=Math.abs(p.lat).toFixed(1)+"° "+(p.lat>=0?"N":"S");
+  document.getElementById("t-lon").textContent=Math.abs(lon).toFixed(1)+"° "+(lon>=0?"E":"O");
+  document.getElementById("survol-nom").textContent=region(p.lat,lon);
+  document.getElementById("badge-ombre").textContent=estDeNuit(p.lat,lon)?"Côté nuit":"Côté jour";
+  majDistance();
+}
+
+/* ============ SGP4 : éléments orbitaux et passages ============ */
+let satrec=null, passages=[], calculEnCours=false;
+const CLE_TLE="iss-tle-v1";
+
+function message(titre,texte){
+  const m=document.getElementById("p-message");
+  m.innerHTML=`<b>${titre}</b>${texte}`; m.hidden=false;
+  document.getElementById("p-detail").hidden=true;
+}
+function charger(src){
+  return new Promise((ok,ko)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=ko;document.head.appendChild(s);});
+}
+async function chargerBibliotheque(){
+  const sources=["https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js",
+                 "https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js",
+                 "https://cdnjs.cloudflare.com/ajax/libs/satellite.js/5.0.0/satellite.min.js"];
+  for(const s of sources){ try{ await charger(s); if(window.satellite) return true; }catch(e){} }
+  return false;
+}
+function lireCache(){
+  try{ const j=JSON.parse(localStorage.getItem(CLE_TLE)); 
+    if(j&&Date.now()-j.t<3*86400000) return j; }catch(e){}
+  return null;
+}
+function ecrireCache(l1,l2){
+  try{ localStorage.setItem(CLE_TLE,JSON.stringify({l1,l2,t:Date.now()})); }catch(e){}
+}
+/* Les deux sources renvoient soit deux lignes brutes, soit un objet JSON */
+function extraireTLE(brut){
+  try{
+    const j=JSON.parse(brut);
+    if(j.line1&&j.line2) return {l1:j.line1.trim(),l2:j.line2.trim()};
+    if(j.tle) brut=j.tle;
+  }catch(e){}
+  const lignes=String(brut).trim().split(/\r?\n/).map(s=>s.trim());
+  const l1=lignes.find(s=>/^1 \d{5}/.test(s)), l2=lignes.find(s=>/^2 \d{5}/.test(s));
+  return l1&&l2?{l1,l2}:null;
+}
+async function chargerTLE(){
+  for(const u of [`${API}/tles?format=text`,
+                  "https://celestrak.org/NORAD/elements/gp.php?CATNR=25544&FORMAT=TLE"]){
+    try{
+      const t=await (await fetch(u,{cache:"no-store"})).text();
+      const tle=extraireTLE(t);
+      if(tle){ ecrireCache(tle.l1,tle.l2); return tle; }
+    }catch(e){}
+  }
+  return lireCache();
+}
+function positionSGP4(date){
+  if(!satrec) return null;
+  const pv=satellite.propagate(satrec,date);
+  if(!pv||!pv.position) return null;
+  const g=satellite.eciToGeodetic(pv.position,satellite.gstime(date));
+  return {lat:g.latitude*D, lon:normLon(g.longitude*D), h:g.height};
+}
+
+/* Le satellite est éclairé s'il est du côté jour, ou hors du cylindre d'ombre terrestre */
+function illumine(pos,sun){
+  const proj=pos.x*sun.x+pos.y*sun.y+pos.z*sun.z;
+  if(proj>0) return true;
+  const px=pos.x-proj*sun.x, py=pos.y-proj*sun.y, pz=pos.z-proj*sun.z;
+  return Math.sqrt(px*px+py*py+pz*pz)>6378.14;
+}
+function hauteurSoleil(lat,lon,date){
+  const {ra,dec}=soleilRaDec(date);
+  const H=satellite.gstime(date)+lon*R-ra;
+  return Math.asin(Math.sin(lat*R)*Math.sin(dec)+Math.cos(lat*R)*Math.cos(dec)*Math.cos(H))*D;
+}
+function magnitude(rangeKm,phase){
+  const f=(Math.sin(phase)+(Math.PI-phase)*Math.cos(phase))/Math.PI;
+  return -1.8+5*Math.log10(rangeKm/1000)-2.5*Math.log10(Math.max(f,1e-3));
+}
+
+function calculerPassages(){
+  const obs={longitude:moi.lon*R,latitude:moi.lat*R,height:.1};
+  const obsEcf=satellite.geodeticToEcf(obs);
+  const debut=Date.now(), fin=debut+7*86400000;
+  const res=[]; let ouvert=null;
+
+  const echantillon=ms=>{
+    const date=new Date(ms), gmst=satellite.gstime(date);
+    const pv=satellite.propagate(satrec,date);
+    if(!pv||!pv.position) return null;
+    const look=satellite.ecfToLookAngles(obs,satellite.eciToEcf(pv.position,gmst));
+    return {ms,date,gmst,eci:pv.position,el:look.elevation*D,az:look.azimuth*D,dist:look.rangeSat};
+  };
+  const details=e=>{
+    const {ra,dec}=soleilRaDec(e.date);
+    const sun={x:Math.cos(dec)*Math.cos(ra),y:Math.cos(dec)*Math.sin(ra),z:Math.sin(dec)};
+    const eclaire=illumine(e.eci,sun);
+    const obsEci=satellite.ecfToEci(obsEcf,e.gmst);
+    const UA=1.496e8;
+    const a={x:sun.x*UA-e.eci.x,y:sun.y*UA-e.eci.y,z:sun.z*UA-e.eci.z};
+    const b={x:obsEci.x-e.eci.x,y:obsEci.y-e.eci.y,z:obsEci.z-e.eci.z};
+    const na=Math.hypot(a.x,a.y,a.z), nb=Math.hypot(b.x,b.y,b.z);
+    const phase=Math.acos(Math.max(-1,Math.min(1,(a.x*b.x+a.y*b.y+a.z*b.z)/(na*nb))));
+    const hs=hauteurSoleil(moi.lat,moi.lon,e.date);
+    return {eclaire,phase,hs,visible:eclaire&&hs<-6};
+  };
+
+  for(let ms=debut; ms<fin; ms+=30000){
+    const e=echantillon(ms); if(!e) continue;
+    if(e.el>0){ if(!ouvert) ouvert=[]; ouvert.push(e); }
+    else if(ouvert){
+      if(ouvert.length>2){
+        let max=ouvert[0], visible=false, magMin=99;
+        const trace=[];
+        for(let k=0;k<ouvert.length;k++){
+          const e2=ouvert[k];
+          if(e2.el>max.el) max=e2;
+          trace.push([e2.az,e2.el]);
+          const d=details(e2);
+          if(d.visible){ visible=true; magMin=Math.min(magMin,magnitude(e2.dist,d.phase)); }
+        }
+        if(max.el>=10) res.push({
+          debut:ouvert[0].date, fin:ouvert[ouvert.length-1].date, max:max.date,
+          elev:Math.round(max.el), azDebut:ouvert[0].az, azFin:ouvert[ouvert.length-1].az,
+          duree:(ouvert[ouvert.length-1].ms-ouvert[0].ms)/60000, visible, mag:visible?magMin:null, trace
+        });
+      }
+      ouvert=null;
+    }
+  }
+  return res;
+}
+let dernierCalcul=null;
+async function lancerCalcul(){
+  if(!moi||!satrec||calculEnCours) return;
+  const cle=moi.lat.toFixed(2)+","+moi.lon.toFixed(2);
+  if(dernierCalcul===cle) return;          // le nom du lieu a changé, pas la position
+  dernierCalcul=cle;
+  calculEnCours=true;
+  message("Calcul en cours","Propagation SGP4 sur sept jours.");
+  await new Promise(r=>setTimeout(r,30));
+  try{
+    passages=calculerPassages().filter(p=>p.visible);
+    afficherPassages();
+  }catch(e){ message("Calcul impossible","Les éléments orbitaux n'ont pas pu être exploités."); }
+  calculEnCours=false;
+}
+
+/* ============ Affichage des passages ============ */
+const CARD=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSO","SO","OSO","O","ONO","NO","NNO"];
+const card=a=>CARD[Math.round(((a%360)+360)%360/22.5)%16];
+const fmtH=d=>new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit",timeZone:tzMoi}).format(d);
+const fmtJ=d=>new Intl.DateTimeFormat("fr-FR",{weekday:"short",day:"numeric",month:"short",timeZone:tzMoi}).format(d);
+
+function dessinerCiel(trace,elMax){
+  const proj=(az,el)=>{const r=(90-el)/90*52; return [60+r*Math.sin(az*R), 60-r*Math.cos(az*R)];};
+  document.getElementById("arc-passage").setAttribute("points",
+    trace.map(([a,e])=>proj(a,Math.max(e,0)).map(v=>v.toFixed(1)).join(",")).join(" "));
+  const d=proj(trace[0][0],Math.max(trace[0][1],0));
+  document.getElementById("pt-debut").setAttribute("cx",d[0]);
+  document.getElementById("pt-debut").setAttribute("cy",d[1]);
+  const m=trace.reduce((x,y)=>y[1]>x[1]?y:x,trace[0]), pm=proj(m[0],m[1]);
+  document.getElementById("pt-max").setAttribute("cx",pm[0]);
+  document.getElementById("pt-max").setAttribute("cy",pm[1]);
+}
+function afficherPassages(){
+  const l=document.getElementById("liste-passages"); l.innerHTML="";
+  if(!passages.length){
+    message("Aucun passage visible","La station survolera ta région, mais jamais dans les conditions d'éclairage nécessaires ces sept prochains jours.");
+    return;
+  }
+  const p=passages[0];
+  document.getElementById("p-message").hidden=true;
+  document.getElementById("p-detail").hidden=false;
+  document.getElementById("p-quand").textContent=fmtJ(p.debut).toUpperCase()+" · "+card(p.azDebut)+" → "+card(p.azFin);
+  document.getElementById("p-debut").textContent=fmtH(p.debut);
+  document.getElementById("p-fin").textContent=fmtH(p.fin);
+  document.getElementById("p-elev").textContent=p.elev+"°";
+  document.getElementById("p-mag").textContent=p.mag!=null?p.mag.toFixed(1):"—";
+  document.getElementById("p-duree").textContent=p.duree.toFixed(1).replace(".",",")+" min";
+  dessinerCiel(p.trace,p.elev);
+  passages.slice(0,7).forEach(x=>{
+    const d=document.createElement("div"); d.className="ligne";
+    d.innerHTML=`<div class="jour">${fmtH(x.debut)}<em>${fmtJ(x.debut)}</em></div>
+      <div class="jauge"><i style="width:${Math.round(x.elev/90*100)}%"></i></div>
+      <div class="elev">${x.elev}°<small>${card(x.azDebut)}→${card(x.azFin)}</small></div>`;
+    l.appendChild(d);
+  });
+  majChrono();
+}
+function majChrono(){
+  if(!passages.length) return;
+  let s=Math.floor((passages[0].debut-Date.now())/1000);
+  if(s<-passages[0].duree*60){ passages.shift(); afficherPassages(); return; }
+  const enCours=s<=0;
+  s=Math.abs(s);
+  const h=Math.floor(s/3600); s%=3600;
+  document.getElementById("p-chrono").textContent=(enCours?"+":"")+pad(h)+":"+pad(Math.floor(s/60))+":"+pad(s%60);
+}
+
+/* ============ Démarrage ============ */
+function horloge(){
+  document.getElementById("horloge").textContent=
+    new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"UTC"}).format(new Date())+" UTC";
+}
+(async function(){
+  tracerNuit(); horloge();
+  recaler().then(animer);
+  demanderPosition();
+  setInterval(()=>{horloge();majChrono();},1000);
+  setInterval(animer,250);
+  setInterval(recaler,30000);
+  setInterval(tracerNuit,60000);
+  window.addEventListener("resize",()=>carte.invalidateSize());
+
+  if(!await chargerBibliotheque()){ message("Prévision indisponible","La bibliothèque de propagation orbitale n'a pas pu être chargée."); return; }
+  const tle=await chargerTLE();
+  if(!tle){ message("Éléments orbitaux introuvables","Reconnecte-toi pour télécharger les données du jour."); return; }
+  satrec=satellite.twoline2satrec(tle.l1,tle.l2);
+  lancerCalcul();
+})();
+
+if("serviceWorker" in navigator) window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"));
+</script>
+</body>
+</html>
