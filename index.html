@@ -104,6 +104,7 @@ section{padding:22px 18px 0}
   color:var(--ambre);margin-top:5px;font-variant-numeric:tabular-nums}
 .compte .heure{font-family:'IBM Plex Mono',monospace;font-size:10.5px;margin-top:7px;white-space:nowrap}
 .compte .heure b{color:var(--turquoise);font-weight:500}
+.compte .horizon{font-family:'IBM Plex Mono',monospace;font-size:9px;margin-top:4px;color:#5F7590;white-space:nowrap}
 .ciel{flex:0 0 118px}
 .passage-bas{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--bordure)}
 .pb{padding:11px 12px;border-right:1px solid var(--bordure)}
@@ -177,7 +178,8 @@ section{padding:22px 18px 0}
         <div class="compte">
           <div class="quand" id="p-quand">—</div>
           <div class="chrono" id="p-chrono">—:—:—</div>
-          <div class="heure">Lever <b id="p-debut">—</b> · Coucher <b id="p-fin">—</b></div>
+          <div class="heure">Visible <b id="p-vdebut">—</b> → <b id="p-vfin">—</b></div>
+          <div class="horizon">Horizon <span id="p-hdebut">—</span> → <span id="p-hfin">—</span></div>
         </div>
         <div class="ciel">
           <svg viewBox="0 0 120 120" aria-label="Trajectoire dans le ciel">
@@ -186,7 +188,8 @@ section{padding:22px 18px 0}
               <circle cx="60" cy="60" r="17.3" opacity=".35"/>
               <line x1="60" y1="8" x2="60" y2="112" opacity=".35"/><line x1="8" y1="60" x2="112" y2="60" opacity=".35"/>
             </g>
-            <polyline id="arc-passage" fill="none" stroke="#F5A623" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline id="arc-total" fill="none" stroke="#F5A623" stroke-width="1.4" opacity=".28" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline id="arc-passage" fill="none" stroke="#F5A623" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
             <circle id="pt-debut" r="2.2" fill="none" stroke="#6FD3C7" stroke-width="1.4"/>
             <circle id="pt-max" r="2.8" fill="#F5A623"/>
             <g font-family="IBM Plex Mono" font-size="7" fill="#8DA3BE" text-anchor="middle">
@@ -209,9 +212,9 @@ section{padding:22px 18px 0}
   <div class="eyebrow">Passages des sept prochains jours</div>
   <div class="liste" id="liste-passages"></div>
   <div class="note">
-    Passages calculés par propagation <b>SGP4</b> à partir des éléments orbitaux du jour, avec test
-    d'illumination du satellite et de nuit au sol. La courbe sur la carte représente le plan orbital
-    instantané, pas le trajet des prochaines heures.
+    Passages calculés par propagation <b>SGP4</b> à partir des éléments orbitaux du jour. L'heure retenue
+    est celle de la <b>visibilité réelle</b> : station éclairée par le Soleil et ciel assez sombre chez toi.
+    Elle commence après le lever au-dessus de l'horizon et s'achève dès l'entrée dans l'ombre de la Terre.
   </div>
 </section>
 
@@ -519,20 +522,33 @@ function calculerPassages(){
     if(e.el>0){ if(!ouvert) ouvert=[]; ouvert.push(e); }
     else if(ouvert){
       if(ouvert.length>2){
-        let max=ouvert[0], visible=false, magMin=99;
+        let max=ouvert[0], magMin=99, iDeb=-1, iFin=-1;
         const trace=[];
         for(let k=0;k<ouvert.length;k++){
-          const e2=ouvert[k];
-          if(e2.el>max.el) max=e2;
-          trace.push([e2.az,e2.el]);
+          const e2=ouvert[k]; if(e2.el>max.el) max=e2;
           const d=details(e2);
-          if(d.visible){ visible=true; magMin=Math.min(magMin,magnitude(e2.dist,d.phase)); }
+          trace.push([e2.az,e2.el,d.visible]);
+          if(d.visible){
+            if(iDeb<0) iDeb=k;
+            iFin=k;
+            magMin=Math.min(magMin,magnitude(e2.dist,d.phase));
+          }
         }
-        if(max.el>=10) res.push({
-          debut:ouvert[0].date, fin:ouvert[ouvert.length-1].date, max:max.date,
-          elev:Math.round(max.el), azDebut:ouvert[0].az, azFin:ouvert[ouvert.length-1].az,
-          duree:(ouvert[ouvert.length-1].ms-ouvert[0].ms)/60000, visible, mag:visible?magMin:null, trace
-        });
+        /* la station s'éteint en entrant dans l'ombre : la fenêtre observable
+           est presque toujours plus courte que le temps passé au-dessus de l'horizon */
+        if(max.el>=10&&iDeb>=0){
+          const a=ouvert[iDeb], b=ouvert[iFin];
+          let maxVis=a;
+          for(let k=iDeb;k<=iFin;k++) if(ouvert[k].el>maxVis.el) maxVis=ouvert[k];
+          res.push({
+            debut:ouvert[0].date, fin:ouvert[ouvert.length-1].date,
+            visDebut:a.date, visFin:b.date,
+            elev:Math.round(maxVis.el), elevHorizon:Math.round(max.el),
+            azDebut:a.az, azFin:b.az,
+            duree:(b.ms-a.ms)/60000, dureeHorizon:(ouvert[ouvert.length-1].ms-ouvert[0].ms)/60000,
+            mag:magMin<99?magMin:null, trace
+          });
+        }
       }
       ouvert=null;
     }
@@ -549,7 +565,7 @@ async function lancerCalcul(){
   message("Calcul en cours","Propagation SGP4 sur sept jours.");
   await new Promise(r=>setTimeout(r,30));
   try{
-    passages=calculerPassages().filter(p=>p.visible);
+    passages=calculerPassages().filter(p=>p.duree>=1);
     afficherPassages();
   }catch(e){ message("Calcul impossible","Les éléments orbitaux n'ont pas pu être exploités."); }
   calculEnCours=false;
@@ -561,14 +577,17 @@ const card=a=>CARD[Math.round(((a%360)+360)%360/22.5)%16];
 const fmtH=d=>new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit",timeZone:tzMoi}).format(d);
 const fmtJ=d=>new Intl.DateTimeFormat("fr-FR",{weekday:"short",day:"numeric",month:"short",timeZone:tzMoi}).format(d);
 
-function dessinerCiel(trace,elMax){
-  const proj=(az,el)=>{const r=(90-el)/90*52; return [60+r*Math.sin(az*R), 60-r*Math.cos(az*R)];};
-  document.getElementById("arc-passage").setAttribute("points",
-    trace.map(([a,e])=>proj(a,Math.max(e,0)).map(v=>v.toFixed(1)).join(",")).join(" "));
-  const d=proj(trace[0][0],Math.max(trace[0][1],0));
+function dessinerCiel(trace){
+  const proj=(az,el)=>{const r=(90-Math.max(el,0))/90*52; return [60+r*Math.sin(az*R), 60-r*Math.cos(az*R)];};
+  const pts=a=>a.map(([az,el])=>proj(az,el).map(v=>v.toFixed(1)).join(",")).join(" ");
+  document.getElementById("arc-total").setAttribute("points",pts(trace));
+  const vis=trace.filter(t=>t[2]);
+  document.getElementById("arc-passage").setAttribute("points",pts(vis.length?vis:trace));
+  const ref=vis.length?vis:trace;
+  const d=proj(ref[0][0],ref[0][1]);
   document.getElementById("pt-debut").setAttribute("cx",d[0]);
   document.getElementById("pt-debut").setAttribute("cy",d[1]);
-  const m=trace.reduce((x,y)=>y[1]>x[1]?y:x,trace[0]), pm=proj(m[0],m[1]);
+  const m=ref.reduce((x,y)=>y[1]>x[1]?y:x,ref[0]), pm=proj(m[0],m[1]);
   document.getElementById("pt-max").setAttribute("cx",pm[0]);
   document.getElementById("pt-max").setAttribute("cy",pm[1]);
 }
@@ -581,28 +600,29 @@ function afficherPassages(){
   const p=passages[0];
   document.getElementById("p-message").hidden=true;
   document.getElementById("p-detail").hidden=false;
-  document.getElementById("p-quand").textContent=fmtJ(p.debut).toUpperCase()+" · "+card(p.azDebut)+" → "+card(p.azFin);
-  document.getElementById("p-debut").textContent=fmtH(p.debut);
-  document.getElementById("p-fin").textContent=fmtH(p.fin);
+  document.getElementById("p-quand").textContent=fmtJ(p.visDebut).toUpperCase()+" · "+card(p.azDebut)+" → "+card(p.azFin);
+  document.getElementById("p-vdebut").textContent=fmtH(p.visDebut);
+  document.getElementById("p-vfin").textContent=fmtH(p.visFin);
+  document.getElementById("p-hdebut").textContent=fmtH(p.debut);
+  document.getElementById("p-hfin").textContent=fmtH(p.fin);
   document.getElementById("p-elev").textContent=p.elev+"°";
   document.getElementById("p-mag").textContent=p.mag!=null?p.mag.toFixed(1):"—";
   document.getElementById("p-duree").textContent=p.duree.toFixed(1).replace(".",",")+" min";
-  dessinerCiel(p.trace,p.elev);
+  dessinerCiel(p.trace);
   passages.slice(0,7).forEach(x=>{
     const d=document.createElement("div"); d.className="ligne";
-    d.innerHTML=`<div class="jour">${fmtH(x.debut)}<em>${fmtJ(x.debut)}</em></div>
+    d.innerHTML=`<div class="jour">${fmtH(x.visDebut)}<em>${fmtJ(x.visDebut)}</em></div>
       <div class="jauge"><i style="width:${Math.round(x.elev/90*100)}%"></i></div>
-      <div class="elev">${x.elev}°<small>${card(x.azDebut)}→${card(x.azFin)}</small></div>`;
+      <div class="elev">${x.elev}°<small>${x.duree.toFixed(0)} min</small></div>`;
     l.appendChild(d);
   });
   majChrono();
 }
 function majChrono(){
   if(!passages.length) return;
-  let s=Math.floor((passages[0].debut-Date.now())/1000);
+  let s=Math.floor((passages[0].visDebut-Date.now())/1000);
   if(s<-passages[0].duree*60){ passages.shift(); afficherPassages(); return; }
-  const enCours=s<=0;
-  s=Math.abs(s);
+  const enCours=s<=0; s=Math.abs(s);
   const h=Math.floor(s/3600); s%=3600;
   document.getElementById("p-chrono").textContent=(enCours?"+":"")+pad(h)+":"+pad(Math.floor(s/60))+":"+pad(s%60);
 }
