@@ -1,6 +1,6 @@
 /* Station — Suivi ISS
    Incrémenter VERSION à chaque modification de index.html ou des ressources. */
-const VERSION = "iss-v5";
+const VERSION = "iss-v6";
 const COQUE = [
   "./",
   "./index.html",

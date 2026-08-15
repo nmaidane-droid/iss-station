@@ -228,10 +228,22 @@ let suivi=true, moi=null, tzMoi=Intl.DateTimeFormat().resolvedOptions().timeZone
 const carte=L.map("carte",{zoomControl:false,attributionControl:true,minZoom:0,maxZoom:8,zoomSnap:.25,
   zoomDelta:.5,wheelPxPerZoomLevel:80}).setView([10,0],1);
 L.control.zoom({position:"topright"}).addTo(carte);
-const fondPlan=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  {attribution:'© OpenStreetMap · © CARTO',subdomains:"abcd",maxZoom:8}).addTo(carte);
-const fondSat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  {attribution:"Imagerie © Esri",maxZoom:8});
+/* Fonds Esri : les libellés y sont en anglais. CARTO n'affiche que les noms
+   en langue locale, sans réglage possible. */
+const ESRI="https://server.arcgisonline.com/ArcGIS/rest/services/";
+const ATTR="Esri · HERE · Garmin · © OpenStreetMap";
+const fondPlan=L.layerGroup([
+  L.tileLayer(ESRI+"Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+    {attribution:ATTR,maxZoom:8}),
+  L.tileLayer(ESRI+"Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+    {maxZoom:8})
+]).addTo(carte);
+const fondSat=L.layerGroup([
+  L.tileLayer(ESRI+"World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {attribution:"Imagerie © Esri",maxZoom:8}),
+  L.tileLayer(ESRI+"Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+    {maxZoom:8})
+]);
 
 const cNuit=[-360,0,360].map(()=>L.polygon([],{stroke:false,
   fillColor:"#0B1B2E",fillOpacity:.34,interactive:false}).addTo(carte));
