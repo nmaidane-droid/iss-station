@@ -238,10 +238,24 @@ let suivi=true, moi=null, tzMoi=Intl.DateTimeFormat().resolvedOptions().timeZone
 const carte=L.map("carte",{zoomControl:false,attributionControl:true,minZoom:0,maxZoom:8,zoomSnap:.25,
   zoomDelta:.5,wheelPxPerZoomLevel:80}).setView([10,0],1);
 L.control.zoom({position:"topright"}).addTo(carte);
-const fondPlan=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+/* CARTO exige désormais une clé. Elle est visible dans le source : à restreindre
+   au domaine de déploiement depuis le compte CARTO. */
+const CARTO_KEY="cb1_269n_1_75a47770d40169727a932058";
+const ESRI="https://server.arcgisonline.com/ArcGIS/rest/services/";
+const fondPlan=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?api_key="+CARTO_KEY,
   {attribution:'© OpenStreetMap · © CARTO',subdomains:"abcd",maxZoom:8}).addTo(carte);
-const fondSat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+const fondSat=L.tileLayer(ESRI+"World_Imagery/MapServer/tile/{z}/{y}/{x}",
   {attribution:"Imagerie © Esri",maxZoom:8});
+/* L'imagerie satellite n'a aucun libellé : on en ajoute à partir du zoom 4,
+   où ils deviennent lisibles, sans alourdir la vue monde. */
+const nomsSat=L.tileLayer(ESRI+"Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:8});
+const ZOOM_NOMS=4;
+let satActif=false;
+function majNoms(){
+  const actifs=satActif&&carte.getZoom()>=ZOOM_NOMS;
+  if(actifs&&!carte.hasLayer(nomsSat)) nomsSat.addTo(carte);
+  if(!actifs&&carte.hasLayer(nomsSat)) carte.removeLayer(nomsSat);
+}
 
 const cNuit=[-360,0,360].map(()=>L.polygon([],{stroke:false,
   fillColor:"#0B1B2E",fillOpacity:.34,interactive:false}).addTo(carte));
@@ -263,12 +277,15 @@ const zoomMonde=()=>Math.max(0,Math.log2(carte.getSize().x/256));
 
 const ongPlan=document.getElementById("ong-plan"), ongSat=document.getElementById("ong-sat");
 function choisirFond(sat){
+  satActif=sat;
   carte.removeLayer(sat?fondPlan:fondSat);
   (sat?fondSat:fondPlan).addTo(carte);
   ongSat.setAttribute("aria-selected",sat); ongPlan.setAttribute("aria-selected",!sat);
+  majNoms();
 }
 ongPlan.onclick=()=>choisirFond(false);
 ongSat.onclick=()=>choisirFond(true);
+carte.on("zoomend",majNoms);
 const btnC=document.getElementById("btn-centrer");
 btnC.onclick=()=>{suivi=!suivi;btnC.setAttribute("aria-pressed",suivi);
   if(suivi&&courante) carte.flyTo(courante,carte.getZoom(),{duration:.8});};
