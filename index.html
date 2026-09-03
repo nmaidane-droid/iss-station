@@ -115,14 +115,22 @@ section{padding:22px 18px 0}
   padding:18px 16px;text-align:center}
 .message b{display:block;color:var(--texte);font-size:12px;margin-bottom:5px}
 
+.entete{display:flex;align-items:flex-end;gap:12px;padding:0 2px 8px;
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible)}
+.entete .jour{width:80px;flex:0 0 80px}
+.entete .sp{flex:1}
+.entete .c{width:46px;flex:0 0 46px;text-align:right}
 .liste{border-top:1px solid var(--bordure)}
-.ligne{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--bordure)}
+.ligne{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--bordure);
+  cursor:pointer;border-left:2px solid transparent;transition:background .15s}
+.ligne[aria-current="true"]{border-left-color:var(--ambre);background:rgba(245,166,35,.07);padding-left:8px}
+.ligne:focus-visible{outline:2px solid var(--turquoise);outline-offset:-2px}
 .ligne .jour{font-family:'IBM Plex Mono',monospace;font-size:11px;width:80px;flex:0 0 80px}
 .ligne .jour em{display:block;font-style:normal;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--texte-faible);margin-top:2px}
 .jauge{flex:1;height:4px;background:rgba(111,211,199,.12);border-radius:2px;overflow:hidden}
 .jauge i{display:block;height:100%;background:linear-gradient(90deg,var(--turquoise),var(--ambre));border-radius:2px}
-.ligne .elev{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;width:52px;text-align:right;flex:0 0 52px}
-.ligne .elev small{font-size:8.5px;color:var(--texte-faible);display:block;letter-spacing:.06em;margin-top:2px}
+.ligne .c{font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;width:46px;flex:0 0 46px;text-align:right}
+.ligne .c.mn{font-size:11px;font-weight:400;color:var(--texte-faible)}
 
 .note{font-family:'IBM Plex Mono',monospace;font-size:9.5px;line-height:1.65;color:var(--texte-faible);
   margin-top:26px;padding:12px 14px;border-left:2px solid rgba(245,166,35,.22);background:rgba(18,35,61,.4)}
@@ -170,7 +178,7 @@ section{padding:22px 18px 0}
 </div>
 
 <section>
-  <div class="eyebrow">Prochain passage visible</div>
+  <div class="eyebrow" id="titre-passage">Prochain passage visible</div>
   <div class="passage">
     <div class="message" id="p-message"><b>Calcul en cours</b>Les passages sont calculés dès que ta position est connue.</div>
     <div id="p-detail" hidden>
@@ -210,6 +218,8 @@ section{padding:22px 18px 0}
 
 <section>
   <div class="eyebrow">Passages des sept prochains jours</div>
+  <div class="entete"><div class="jour">Heure</div><div class="sp"></div>
+    <div class="c">Élév.</div><div class="c">Durée</div></div>
   <div class="liste" id="liste-passages"></div>
   <div class="note">
     Passages calculés par propagation <b>SGP4</b> à partir des éléments orbitaux du jour. L'heure retenue
@@ -572,6 +582,7 @@ async function lancerCalcul(){
   await new Promise(r=>setTimeout(r,30));
   try{
     passages=calculerPassages().filter(p=>p.duree>=1);
+    selection=0;
     afficherPassages();
   }catch(e){ message("Calcul impossible","Les éléments orbitaux n'ont pas pu être exploités."); }
   calculEnCours=false;
@@ -597,13 +608,17 @@ function dessinerCiel(trace){
   document.getElementById("pt-max").setAttribute("cx",pm[0]);
   document.getElementById("pt-max").setAttribute("cy",pm[1]);
 }
+let selection=0;
 function afficherPassages(){
   const l=document.getElementById("liste-passages"); l.innerHTML="";
   if(!passages.length){
     message("Aucun passage visible","La station survolera ta région, mais jamais dans les conditions d'éclairage nécessaires ces sept prochains jours.");
     return;
   }
-  const p=passages[0];
+  if(selection>=passages.length) selection=passages.length-1;
+  const p=passages[selection];
+  document.getElementById("titre-passage").textContent=
+    selection===0?"Prochain passage visible":"Passage sélectionné";
   document.getElementById("p-message").hidden=true;
   document.getElementById("p-detail").hidden=false;
   document.getElementById("p-quand").textContent=fmtJ(p.visDebut).toUpperCase()+" · "+card(p.azDebut)+" → "+card(p.azFin);
@@ -615,19 +630,34 @@ function afficherPassages(){
   document.getElementById("p-mag").textContent=p.mag!=null?p.mag.toFixed(1):"—";
   document.getElementById("p-duree").textContent=p.duree.toFixed(1).replace(".",",")+" min";
   dessinerCiel(p.trace);
-  passages.slice(0,7).forEach(x=>{
-    const d=document.createElement("div"); d.className="ligne";
+  passages.slice(0,7).forEach((x,i)=>{
+    const d=document.createElement("div");
+    d.className="ligne"; d.setAttribute("role","button"); d.tabIndex=0;
+    d.setAttribute("aria-current",i===selection);
     d.innerHTML=`<div class="jour">${fmtH(x.visDebut)}<em>${fmtJ(x.visDebut)}</em></div>
       <div class="jauge"><i style="width:${Math.round(x.elev/90*100)}%"></i></div>
-      <div class="elev">${x.elev}°<small>${x.duree.toFixed(0)} min</small></div>`;
+      <div class="c">${x.elev}°</div><div class="c mn">${x.duree.toFixed(0)} min</div>`;
+    const choisir=()=>{
+      selection=i; afficherPassages();
+      document.querySelector(".passage").scrollIntoView({behavior:"smooth",block:"center"});
+    };
+    d.onclick=choisir;
+    d.onkeydown=e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); choisir(); } };
     l.appendChild(d);
   });
   majChrono();
 }
+/* les passages terminés disparaissent ; la sélection suit le décalage */
+function purger(){
+  const n=Date.now(), avant=passages.length;
+  while(passages.length&&passages[0].visFin.getTime()<n){ passages.shift(); if(selection>0) selection--; }
+  return passages.length!==avant;
+}
 function majChrono(){
   if(!passages.length) return;
-  let s=Math.floor((passages[0].visDebut-Date.now())/1000);
-  if(s<-passages[0].duree*60){ passages.shift(); afficherPassages(); return; }
+  if(purger()){ afficherPassages(); return; }
+  const p=passages[selection];
+  let s=Math.floor((p.visDebut-Date.now())/1000);
   const enCours=s<=0; s=Math.abs(s);
   const h=Math.floor(s/3600); s%=3600;
   document.getElementById("p-chrono").textContent=(enCours?"+":"")+pad(h)+":"+pad(Math.floor(s/60))+":"+pad(s%60);
