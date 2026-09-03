@@ -242,7 +242,7 @@ L.control.zoom({position:"topright"}).addTo(carte);
    au domaine de déploiement depuis le compte CARTO. */
 const CARTO_KEY="cb1_269n_1_75a47770d40169727a932058";
 const ESRI="https://server.arcgisonline.com/ArcGIS/rest/services/";
-const fondPlan=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?api_key="+CARTO_KEY,
+const fondPlan=L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key="+CARTO_KEY,
   {attribution:'© OpenStreetMap · © CARTO',subdomains:"abcd",maxZoom:8}).addTo(carte);
 const fondSat=L.tileLayer(ESRI+"World_Imagery/MapServer/tile/{z}/{y}/{x}",
   {attribution:"Imagerie © Esri",maxZoom:8});
