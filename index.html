@@ -31,16 +31,15 @@ h1,h2,h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacin
 @keyframes pouls{0%{box-shadow:0 0 0 0 rgba(245,166,35,.55)}70%{box-shadow:0 0 0 7px rgba(245,166,35,0)}100%{box-shadow:0 0 0 0 rgba(245,166,35,0)}}
 .bandeau .droite{margin-left:auto;color:var(--turquoise)}
 
-.carte-zone{position:relative;height:46vh;min-height:280px;max-height:420px;background:#0D1B30;border-bottom:1px solid var(--bordure)}
+.carte-zone{position:relative;height:46vh;min-height:280px;max-height:420px;background:#0D1B30;
+  border-bottom:1px solid var(--bordure);overflow:hidden}
+.mention{position:absolute;right:10px;bottom:10px;z-index:600;
+  background:rgba(10,21,38,.86);border:1px solid var(--bordure);border-radius:4px;
+  font-family:'IBM Plex Mono',monospace;font-size:7.5px;line-height:1.5;color:#8DA3BE;
+  padding:4px 8px;white-space:nowrap;backdrop-filter:blur(6px)}
+.mention a{color:#A8BCD4;text-decoration:none}
 #carte{position:absolute;inset:0;background:#0D1B30}
 .leaflet-container{background:#0D1B30;font-family:'IBM Plex Mono',monospace}
-.leaflet-bottom.leaflet-right{z-index:600}
-.leaflet-control-attribution{background:rgba(10,21,38,.82)!important;color:#7A90AC!important;
-  font-family:'IBM Plex Mono',monospace!important;font-size:8px!important;line-height:1.5!important;
-  padding:3px 7px!important;margin:0 8px 8px 0!important;border:1px solid var(--bordure);border-radius:4px;
-  max-width:78%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px)}
-.leaflet-control-attribution a{color:#9DB2CC!important;text-decoration:none}
-.leaflet-control-attribution svg{display:none}
 .leaflet-control-zoom{border:none!important;box-shadow:none!important;margin-top:50px!important;margin-right:10px!important}
 .leaflet-control-zoom a{background:rgba(10,21,38,.88)!important;color:var(--texte)!important;border:1px solid var(--bordure)!important;
   width:26px!important;height:26px!important;line-height:24px!important;font-size:14px!important}
@@ -157,6 +156,7 @@ section{padding:22px 18px 0}
     <button id="ong-sat" role="tab" aria-selected="false">Satellite</button>
   </div>
   <button id="btn-centrer" aria-pressed="true"><span class="led"></span>Suivre</button>
+  <div class="mention" id="mention"></div>
   <div class="survol">
     <div class="sur">À la verticale de</div>
     <div class="nom" id="survol-nom">—</div>
@@ -242,7 +242,12 @@ let suivi=true, moi=null, tzMoi=Intl.DateTimeFormat().resolvedOptions().timeZone
 /* ============ Carte ============ */
 const carte=L.map("carte",{zoomControl:false,attributionControl:false,minZoom:0,maxZoom:8,zoomSnap:.25,
   zoomDelta:.5,wheelPxPerZoomLevel:80}).setView([10,0],1);
-L.control.attribution({position:"bottomright",prefix:'<a href="https://leafletjs.com">Leaflet</a>'}).addTo(carte);
+const LEAFLET='<a href="https://leafletjs.com" target="_blank" rel="noopener">Leaflet</a>';
+const MENTIONS={
+  plan:LEAFLET+' | © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
+  sat:LEAFLET+' | Imagerie © Esri'
+};
+function majMention(){ document.getElementById("mention").innerHTML=satActif?MENTIONS.sat:MENTIONS.plan; }
 L.control.zoom({position:"topright"}).addTo(carte);
 /* CARTO exige désormais une clé. Elle est visible dans le source : à restreindre
    au domaine de déploiement depuis le compte CARTO. */
@@ -287,7 +292,7 @@ function choisirFond(sat){
   carte.removeLayer(sat?fondPlan:fondSat);
   (sat?fondSat:fondPlan).addTo(carte);
   ongSat.setAttribute("aria-selected",sat); ongPlan.setAttribute("aria-selected",!sat);
-  majNoms();
+  majNoms(); majMention();
 }
 ongPlan.onclick=()=>choisirFond(false);
 ongSat.onclick=()=>choisirFond(true);
@@ -692,7 +697,7 @@ function horloge(){
     new Intl.DateTimeFormat("fr-FR",{hour:"2-digit",minute:"2-digit",second:"2-digit",timeZone:"UTC"}).format(new Date())+" UTC";
 }
 (async function(){
-  tracerNuit(); horloge();
+  tracerNuit(); horloge(); majMention();
   recaler().then(animer);
   demanderPosition();
   setInterval(()=>{horloge();majChrono();},1000);
