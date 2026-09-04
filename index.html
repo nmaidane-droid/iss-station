@@ -34,8 +34,13 @@ h1,h2,h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacin
 .carte-zone{position:relative;height:46vh;min-height:280px;max-height:420px;background:#0D1B30;border-bottom:1px solid var(--bordure)}
 #carte{position:absolute;inset:0;background:#0D1B30}
 .leaflet-container{background:#0D1B30;font-family:'IBM Plex Mono',monospace}
-.leaflet-control-attribution{background:rgba(10,21,38,.72)!important;color:#5F7590!important;font-size:8px!important;padding:1px 5px!important}
-.leaflet-control-attribution a{color:#7A90AC!important}
+.leaflet-bottom.leaflet-right{z-index:600}
+.leaflet-control-attribution{background:rgba(10,21,38,.82)!important;color:#7A90AC!important;
+  font-family:'IBM Plex Mono',monospace!important;font-size:8px!important;line-height:1.5!important;
+  padding:3px 7px!important;margin:0 8px 8px 0!important;border:1px solid var(--bordure);border-radius:4px;
+  max-width:78%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(6px)}
+.leaflet-control-attribution a{color:#9DB2CC!important;text-decoration:none}
+.leaflet-control-attribution svg{display:none}
 .leaflet-control-zoom{border:none!important;box-shadow:none!important;margin-top:50px!important;margin-right:10px!important}
 .leaflet-control-zoom a{background:rgba(10,21,38,.88)!important;color:var(--texte)!important;border:1px solid var(--bordure)!important;
   width:26px!important;height:26px!important;line-height:24px!important;font-size:14px!important}
@@ -65,7 +70,7 @@ h1,h2,h3{font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacin
 #btn-centrer[aria-pressed="true"] .led{background:var(--ambre);animation:pouls 2.4s infinite}
 button:focus-visible{outline:2px solid var(--turquoise);outline-offset:2px}
 
-.survol{position:absolute;left:10px;bottom:10px;z-index:500;pointer-events:none;
+.survol{position:absolute;left:10px;bottom:32px;z-index:500;pointer-events:none;
   background:rgba(10,21,38,.86);border:1px solid var(--bordure);border-radius:6px;padding:8px 11px;backdrop-filter:blur(6px)}
 .survol .sur{font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--turquoise)}
 .survol .nom{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:19px;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
@@ -235,8 +240,9 @@ const COPIES=[-720,-360,0,360,720];
 let suivi=true, moi=null, tzMoi=Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /* ============ Carte ============ */
-const carte=L.map("carte",{zoomControl:false,attributionControl:true,minZoom:0,maxZoom:8,zoomSnap:.25,
+const carte=L.map("carte",{zoomControl:false,attributionControl:false,minZoom:0,maxZoom:8,zoomSnap:.25,
   zoomDelta:.5,wheelPxPerZoomLevel:80}).setView([10,0],1);
+L.control.attribution({position:"bottomright",prefix:'<a href="https://leafletjs.com">Leaflet</a>'}).addTo(carte);
 L.control.zoom({position:"topright"}).addTo(carte);
 /* CARTO exige désormais une clé. Elle est visible dans le source : à restreindre
    au domaine de déploiement depuis le compte CARTO. */
